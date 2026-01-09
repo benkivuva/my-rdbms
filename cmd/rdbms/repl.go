@@ -67,6 +67,12 @@ func (e *Engine) Execute(input string) {
 
 	case *sql.SelectStatement:
 		var exec executor.Executor = executor.NewSeqScanExecutor(e.heap)
+		
+		// Handle JOIN
+		if s.Join != nil {
+			exec = executor.NewNestedLoopJoinExecutor(exec, e.heap, s.Join.OnLeftField, s.Join.OnRightField)
+		}
+		
 		if s.Where != nil {
 			exec = executor.NewFilterExecutor(exec, s.Where)
 		}
@@ -86,6 +92,18 @@ func (e *Engine) Execute(input string) {
 			count++
 		}
 		fmt.Printf("(%d rows)\n", count)
+
+	case *sql.DeleteStatement:
+		exec := executor.NewDeleteExecutor(e.heap, e.btree, s.Where)
+		tuple, err := exec.Next()
+		if err != nil {
+			fmt.Println("Execution Error:", err)
+		} else if tuple != nil {
+			fmt.Printf("DELETE %v rows\n", tuple.Values[0])
+		}
+
+	case *sql.UpdateStatement:
+		fmt.Println("UPDATE: Not fully implemented yet (use DELETE + INSERT)")
 
 	case *sql.CreateTableStatement:
 		fmt.Println("CREATE TABLE: Tables are implicit in this simple engine.")

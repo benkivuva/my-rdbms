@@ -105,6 +105,21 @@ func (th *TableHeap) GetTuple(rid RID) ([]byte, error) {
 	return out, nil
 }
 
+// DeleteTuple marks a tuple as deleted by its RID.
+func (th *TableHeap) DeleteTuple(rid RID) error {
+	page, err := th.bufferPool.FetchPage(rid.PageID)
+	if err != nil {
+		return err
+	}
+	sp := NewSlottedPage(page)
+	if !sp.DeleteTuple(int(rid.SlotID)) {
+		th.bufferPool.UnpinPage(rid.PageID, false)
+		return fmt.Errorf("tuple not found")
+	}
+	th.bufferPool.UnpinPage(rid.PageID, true)
+	return nil
+}
+
 // TableIterator iterates over all tuples in the heap.
 type TableIterator struct {
 	tableHeap  *TableHeap

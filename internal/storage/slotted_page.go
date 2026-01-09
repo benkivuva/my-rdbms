@@ -101,3 +101,13 @@ func (sp *SlottedPage) GetTuple(slotIdx int) []byte {
 	}
 	return sp.page.Data[off : off+length]
 }
+
+// DeleteTuple marks a slot as deleted by setting its length to 0.
+func (sp *SlottedPage) DeleteTuple(slotIdx int) bool {
+	if slotIdx >= int(sp.GetNumSlots()) {
+		return false
+	}
+	off, _ := sp.GetSlot(slotIdx)
+	sp.SetSlot(slotIdx, off, 0)
+	return true
+}

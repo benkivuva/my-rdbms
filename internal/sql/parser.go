@@ -48,6 +48,8 @@ func (p *Parser) Parse() (Statement, error) {
 			return p.parseSelect()
 		case "DELETE":
 			return p.parseDelete()
+		case "UPDATE":
+			return p.parseUpdate()
 		}
 	}
 	return nil, fmt.Errorf("unexpected token %v", p.curToken)
@@ -163,41 +165,61 @@ func (p *Parser) parseInsert() (*InsertStatement, error) {
 	return &InsertStatement{TableName: tableName, Values: values}, nil
 }
 
-// SELECT * FROM name WHERE ...
+// SELECT * FROM name [JOIN table ON t1.c=t2.c] [WHERE ...]
 func (p *Parser) parseSelect() (*SelectStatement, error) {
-	// Fields
-    fields := []string{}
-    p.nextToken() // Skip SELECT
-    
-    // Parse fields until FROM
-    for p.curToken.Value != "FROM" && p.curToken.Type != TokenEOF {
-        fields = append(fields, p.curToken.Value) // Could be "*"
-        if p.peekToken.Value == "," {
-            p.nextToken()
-        }
-        p.nextToken()
-    }
-    
-    if p.curToken.Value != "FROM" {
-        return nil, fmt.Errorf("expected FROM")
-    }
-    
-    if err := p.expectPeek(TokenIdentifier, ""); err != nil {
-        return nil, err
-    }
-    tableName := p.curToken.Value
-    
-    var where *WhereClause
-    if p.peekToken.Value == "WHERE" {
-        p.nextToken() 
-        w, err := p.parseWhere()
-        if err != nil {
-            return nil, err
-        }
-        where = w
-    }
-    
-    return &SelectStatement{TableName: tableName, Fields: fields, Where: where}, nil
+	fields := []string{}
+	p.nextToken()
+
+	for p.curToken.Value != "FROM" && p.curToken.Type != TokenEOF {
+		fields = append(fields, p.curToken.Value)
+		if p.peekToken.Value == "," {
+			p.nextToken()
+		}
+		p.nextToken()
+	}
+
+	if p.curToken.Value != "FROM" {
+		return nil, fmt.Errorf("expected FROM")
+	}
+
+	if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+		return nil, err
+	}
+	tableName := p.curToken.Value
+
+	var join *JoinClause
+	if p.peekToken.Value == "JOIN" {
+		p.nextToken()
+		if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+			return nil, err
+		}
+		joinTable := p.curToken.Value
+		if err := p.expectPeek(TokenKeyword, "ON"); err != nil {
+			return nil, err
+		}
+		if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+			return nil, err
+		}
+		leftField := p.curToken.Value
+		p.nextToken() // skip =
+		if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+			return nil, err
+		}
+		rightField := p.curToken.Value
+		join = &JoinClause{JoinTable: joinTable, OnLeftField: leftField, OnRightField: rightField}
+	}
+
+	var where *WhereClause
+	if p.peekToken.Value == "WHERE" {
+		p.nextToken()
+		w, err := p.parseWhere()
+		if err != nil {
+			return nil, err
+		}
+		where = w
+	}
+
+	return &SelectStatement{TableName: tableName, Fields: fields, Join: join, Where: where}, nil
 }
 
 // DELETE FROM name WHERE ...
@@ -246,6 +268,57 @@ func (p *Parser) parseWhere() (*WhereClause, error) {
     }
     
     return &WhereClause{Field: field, Op: op, Value: val}, nil
+}
+
+// UPDATE table SET col=val [, col2=val2] WHERE ...
+func (p *Parser) parseUpdate() (*UpdateStatement, error) {
+	if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+		return nil, err
+	}
+	tableName := p.curToken.Value
+
+	if err := p.expectPeek(TokenKeyword, "SET"); err != nil {
+		return nil, err
+	}
+
+	sets := []SetClause{}
+	for {
+		if err := p.expectPeek(TokenIdentifier, ""); err != nil {
+			return nil, err
+		}
+		col := p.curToken.Value
+
+		p.nextToken() // skip =
+
+		if err := p.nextToken(); err != nil {
+			return nil, err
+		}
+		valStr := p.curToken.Value
+		var val interface{}
+		if v, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+			val = int(v)
+		} else {
+			val = valStr
+		}
+		sets = append(sets, SetClause{Column: col, Value: val})
+
+		if p.peekToken.Value != "," {
+			break
+		}
+		p.nextToken()
+	}
+
+	var where *WhereClause
+	if p.peekToken.Value == "WHERE" {
+		p.nextToken()
+		w, err := p.parseWhere()
+		if err != nil {
+			return nil, err
+		}
+		where = w
+	}
+
+	return &UpdateStatement{TableName: tableName, Sets: sets, Where: where}, nil
 }
 
 func (p *Parser) expectPeek(t TokenType, val string) error {

@@ -8,6 +8,7 @@ const (
 	StmtInsert
 	StmtSelect
 	StmtDelete
+	StmtUpdate
 )
 
 type Statement interface {
@@ -37,22 +38,29 @@ func (s *CreateTableStatement) Type() StatementType { return StmtCreate }
 // InsertStatement: INSERT INTO <name> VALUES (...)
 type InsertStatement struct {
 	TableName string
-	Values    []interface{} // int or string
+	Values    []interface{}
 }
 
 func (s *InsertStatement) Type() StatementType { return StmtInsert }
 
-// SelectStatement: SELECT * FROM <name> WHERE <col> <op> <val>
-// Simplified: Only supports * and single condition WHERE
+// JoinClause represents a JOIN ... ON ... clause
+type JoinClause struct {
+	JoinTable    string
+	OnLeftField  string
+	OnRightField string
+}
+
+// SelectStatement: SELECT * FROM <name> [JOIN table ON ...] [WHERE ...]
 type SelectStatement struct {
 	TableName string
-	Fields    []string // For now only ["*"] or specific fields
+	Fields    []string
+	Join      *JoinClause
 	Where     *WhereClause
 }
 
 type WhereClause struct {
 	Field string
-	Op    string // =, <, >
+	Op    string
 	Value interface{}
 }
 
@@ -65,3 +73,18 @@ type DeleteStatement struct {
 }
 
 func (s *DeleteStatement) Type() StatementType { return StmtDelete }
+
+// SetClause represents a SET col = val assignment
+type SetClause struct {
+	Column string
+	Value  interface{}
+}
+
+// UpdateStatement: UPDATE <name> SET col=val WHERE ...
+type UpdateStatement struct {
+	TableName string
+	Sets      []SetClause
+	Where     *WhereClause
+}
+
+func (s *UpdateStatement) Type() StatementType { return StmtUpdate }
