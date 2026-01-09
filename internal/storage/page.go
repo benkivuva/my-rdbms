@@ -4,10 +4,11 @@ import "encoding/binary"
 
 const (
 	PageSize      = 4096
-	InvalidPageID = -1
+	InvalidPageID PageID = -1
 )
 
-type PageID int
+// PageID uniquely identifies a page on disk.
+type PageID int64
 
 // Page represents a fixed-size block of data.
 type Page struct {
@@ -17,14 +18,12 @@ type Page struct {
 	Data     [PageSize]byte
 }
 
-// NewPage creates a new empty page with the given ID.
+// NewPage creates a new empty page.
 func NewPage(id PageID) *Page {
-	return &Page{
-		ID: id,
-	}
+	return &Page{ID: id}
 }
 
-// GetData returns the byte slice of the page data.
+// GetData returns the page data as a byte slice.
 func (p *Page) GetData() []byte {
 	return p.Data[:]
 }
@@ -34,7 +33,7 @@ func (p *Page) Copy(data []byte) {
 	copy(p.Data[:], data)
 }
 
-// Clear resets the page data.
+// Clear zeros out the page data.
 func (p *Page) Clear() {
 	for i := range p.Data {
 		p.Data[i] = 0

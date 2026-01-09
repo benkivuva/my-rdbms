@@ -14,7 +14,7 @@ type BufferPool struct {
 	mu          sync.Mutex
 }
 
-// NewBufferPool creates a new buffer pool with the given capacity.
+// NewBufferPool creates a buffer pool with the specified capacity.
 func NewBufferPool(capacity int, diskManager *DiskManager) *BufferPool {
 	return &BufferPool{
 		diskManager: diskManager,
@@ -23,8 +23,7 @@ func NewBufferPool(capacity int, diskManager *DiskManager) *BufferPool {
 	}
 }
 
-// FetchPage returns the requested page. If it is not in the buffer pool,
-// it reads it from the disk manager. The returned page is pinned.
+// FetchPage returns a page, reading from disk if not cached.
 func (bp *BufferPool) FetchPage(pageID PageID) (*Page, error) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -50,7 +49,7 @@ func (bp *BufferPool) FetchPage(pageID PageID) (*Page, error) {
 	return page, nil
 }
 
-// UnpinPage decrements the pin count of a page. If isDirty is true, the page is marked as dirty.
+// UnpinPage decrements the pin count and optionally marks dirty.
 func (bp *BufferPool) UnpinPage(pageID PageID, isDirty bool) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -65,7 +64,7 @@ func (bp *BufferPool) UnpinPage(pageID PageID, isDirty bool) {
 	}
 }
 
-// FlushPage writes the page to disk if it is dirty.
+// FlushPage writes a dirty page to disk.
 func (bp *BufferPool) FlushPage(pageID PageID) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -84,7 +83,7 @@ func (bp *BufferPool) flushPage(pageID PageID) error {
 	return nil
 }
 
-// NewPage allocates a new page in the buffer pool and on disk.
+// NewPage allocates a new page in the buffer pool.
 func (bp *BufferPool) NewPage() (*Page, error) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
@@ -103,12 +102,10 @@ func (bp *BufferPool) NewPage() (*Page, error) {
 	page := NewPage(pageID)
 	page.PinCount = 1
 	bp.pages[pageID] = page
-	
+
 	return page, nil
 }
 
-// evict selects a victim page to remove from the buffer pool.
-// It uses a simple policy: find the first unpinned page.
 func (bp *BufferPool) evict() error {
 	for id, page := range bp.pages {
 		if page.PinCount == 0 {
@@ -119,18 +116,18 @@ func (bp *BufferPool) evict() error {
 			return nil
 		}
 	}
-	return errors.New("all pages are pinned") // No victim found
+	return errors.New("all pages are pinned")
 }
 
-// FlushAll flushes all pages to disk.
+// FlushAll writes all dirty pages to disk.
 func (bp *BufferPool) FlushAll() error {
-    bp.mu.Lock()
-    defer bp.mu.Unlock()
-    
-    for id := range bp.pages {
-        if err := bp.flushPage(id); err != nil {
-            return err
-        }
-    }
-    return nil
+	bp.mu.Lock()
+	defer bp.mu.Unlock()
+
+	for id := range bp.pages {
+		if err := bp.flushPage(id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
