@@ -13,6 +13,7 @@ A lightweight, educational Relational Database Management System built from scra
 - **Volcano Executor**: Pull-based query execution model supporting Joins and Filters.
 - **Interactive REPL**: Command-line interface for real-time SQL queries.
 - **REST API**: HTTP endpoint for remote query execution.
+- **Management Console**: A modern, glassmorphism-style web dashboard for data exploration, real-time telemetry, and SQL execution.
 
 ## Installation
 
@@ -55,6 +56,8 @@ my-rdbms/
 │       ├── executor.go     # Executor interface
 │       ├── nodes.go        # SeqScan, Insert, Filter, Delete
 │       └── join_executor.go # Nested Loop Join with iterator reset
+├── public/                 # Web assets
+│   └── index.html          # Management Console (Tailwind/JS)
 ├── go.mod
 └── README.md
 ```
@@ -80,6 +83,37 @@ db> SELECT * FROM users JOIN orders ON users.id = orders.user_id
 [1 Ben 101 1 500]
 (1 rows)
 db> exit
+```
+
+### Run the Server & UI
+
+To access the Management Console, start the RDBMS in server mode:
+
+```bash
+# Start the HTTP server on :8080
+go run cmd/rdbms/*.go server
+```
+
+Then open your browser to [http://localhost:8080](http://localhost:8080).
+
+## Console Preview
+
+> [!NOTE]
+> *Integrated Management Console featuring Data Explorer and Live Telemetry.*
+
+![Management Console Preview](https://via.placeholder.com/800x450.png?text=Management+Console+Preview+Coming+Soon)
+
+## Architecture Overview
+
+### Request Flow
+
+```mermaid
+graph LR
+    A[Frontend: JS/Tailwind] -->|POST /api/query| B[REST API: Go]
+    B --> C[SQL Parser]
+    C --> D[Volcano Executor]
+    D --> E[Table Heap]
+    E --> F[(Disk: .db file)]
 ```
 
 ## Supported SQL
@@ -116,6 +150,7 @@ Volcano-style pull model:
 
 * Each operator implements `Init()`, `Next()`, and `Close()`.
 * **Join Logic**: Implements a Simple Nested Loop Join (SNJL) that rewinds the inner child iterator for every row of the outer child.
+* **Telemetry Integration**: The execution lifecycle is hooked into the telemetry pipeline, allowing the Management Console to trace physical row-pulls and join predicate evaluations in real-time.
 
 ## Limitations
 
@@ -138,9 +173,10 @@ Volcano-style pull model:
 * [x] **Joins**: Nested Loop Join support completed.
 * [ ] **Advanced Joins**: Hash Join implementation for better performance.
 
-### Phase 3: Performance
+### Phase 3: Interface & Experience
 
-* [ ] **Index Scan**: Optimization to use `IndexScanExecutor` for primary key filters.
+* [x] **Web-based Control Plane**: High-fidelity dashboard for DB management.
+* [x] **Engine Telemetry**: Live tracing of I/O and executor events.
 * [ ] **Query Optimizer**: Rule-based optimization for predicate pushdown.
 
 ## License
