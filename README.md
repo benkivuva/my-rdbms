@@ -12,32 +12,50 @@ A lightweight, educational Relational Database Management System built from scra
 - **Interactive REPL**: Command-line interface for SQL queries
 - **REST API**: HTTP endpoint for remote query execution
 
+## Installation
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/benkivuva/my-rdbms.git
+cd my-rdbms
+```
+
+### Prerequisites
+
+- Go 1.18 or higher
+- Git
+
 ## Project Structure
 
 ```
 my-rdbms/
-├── cmd/rdbms/           # Application entry points
-│   ├── main.go          # REPL and server startup
-│   └── repl.go          # Interactive shell logic
+├── cmd/
+│   ├── rdbms/              # Main application
+│   │   ├── main.go         # Entry point
+│   │   └── repl.go         # Interactive shell logic
+│   └── btree_test/         # B-Tree verification utility
+│       └── main.go
 ├── internal/
-│   ├── storage/         # Disk and memory management
-│   │   ├── page.go          # Page definition (4KB)
-│   │   ├── disk_manager.go  # File I/O operations
-│   │   ├── buffer_pool.go   # LRU page cache
-│   │   ├── slotted_page.go  # Tuple layout within pages
-│   │   ├── table_heap.go    # Linked list of pages
-│   │   └── rid.go           # Record identifier
-│   ├── index/           # B-Tree implementation
-│   │   ├── btree.go         # Tree operations
-│   │   └── btree_node.go    # Node structure
-│   ├── sql/             # SQL parsing
-│   │   ├── lexer.go         # Tokenizer
-│   │   ├── parser.go        # AST builder
-│   │   └── ast.go           # Statement definitions
-│   └── executor/        # Query execution
-│       ├── executor.go      # Executor interface
-│       └── nodes.go         # SeqScan, Insert, Filter
-└── go.mod
+│   ├── storage/            # Disk and memory management
+│   │   ├── page.go         # Page definition (4KB)
+│   │   ├── disk_manager.go # File I/O operations
+│   │   ├── buffer_pool.go  # Page cache
+│   │   ├── slotted_page.go # Tuple layout within pages
+│   │   ├── table_heap.go   # Linked list of pages
+│   │   └── rid.go          # Record identifier
+│   ├── index/              # B-Tree implementation
+│   │   ├── btree.go        # Tree operations
+│   │   └── btree_node.go   # Node structure
+│   ├── sql/                # SQL parsing
+│   │   ├── lexer.go        # Tokenizer
+│   │   ├── parser.go       # AST builder
+│   │   └── ast.go          # Statement definitions
+│   └── executor/           # Query execution
+│       ├── executor.go     # Executor interface
+│       └── nodes.go        # SeqScan, Insert, Filter
+├── go.mod
+└── README.md
 ```
 
 ## Quick Start
@@ -117,7 +135,7 @@ Volcano-style pull model:
 - Single table per database file
 - No UPDATE or DELETE operations
 
-## 🚀 Roadmap & Future Work
+##  Roadmap & Future Work
 
 ### Phase 1: Persistence & Reliability
 - [ ] **Catalog Persistence**: Store table schemas and B-Tree root IDs in a dedicated Metadata Page (Page 0).
