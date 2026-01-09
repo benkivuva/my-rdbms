@@ -117,6 +117,22 @@ Volcano-style pull model:
 - Single table per database file
 - No UPDATE or DELETE operations
 
+## 🚀 Roadmap & Future Work
+
+### Phase 1: Persistence & Reliability
+- [ ] **Catalog Persistence**: Store table schemas and B-Tree root IDs in a dedicated Metadata Page (Page 0).
+- [ ] **B-Tree Serialization**: Implement `Serialize/Deserialize` for B-Tree nodes to ensure indexes survive REPL restarts.
+- [ ] **Write-Ahead Logging (WAL)**: Basic redo-logging to provide atomicity in case of crashes.
+
+### Phase 2: SQL Enhancements
+- [ ] **Type System**: Add validation for `VARCHAR` length and `INT` ranges during insertion.
+- [ ] **Delete & Update**: Implement `DeleteExecutor` and `UpdateExecutor` using the RID-based access pattern.
+- [ ] **Joins**: Implement Nested Loop Join (NLJ) support.
+
+### Phase 3: Performance
+- [ ] **Index Scan**: Update the planner to use `IndexScanExecutor` instead of `SeqScan` when a filter matches the primary key.
+- [ ] **Query Optimizer**: Rule-based optimization for predicate pushdown.
+
 ## License
 
 MIT License
