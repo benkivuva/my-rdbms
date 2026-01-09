@@ -20,7 +20,7 @@ func NewBTreeIndex(bp *storage.BufferPool, rootID storage.PageID) (*BTreeIndex, 
 		rootPageID: rootID,
 	}
     
-	if bt.rootPageID == 0 {
+	if bt.rootPageID == storage.InvalidPageID {
 		// Allocate root
 		root, err := bt.bufferPool.NewPage()
 		if err != nil {
@@ -37,7 +37,7 @@ func NewBTreeIndex(bp *storage.BufferPool, rootID storage.PageID) (*BTreeIndex, 
 
 // Search looks up the RID for the given key.
 func (bt *BTreeIndex) Search(key int64) (storage.RID, error) {
-    if bt.rootPageID == 0 {
+    if bt.rootPageID == storage.InvalidPageID {
         return storage.RID{}, fmt.Errorf("empty tree")
     }
 

@@ -2,7 +2,10 @@ package storage
 
 import "encoding/binary"
 
-const PageSize = 4096
+const (
+	PageSize      = 4096
+	InvalidPageID = -1
+)
 
 type PageID int
 
