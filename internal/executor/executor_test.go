@@ -1,6 +1,8 @@
 package executor_test
 
 import (
+	"encoding/binary"
+	"fmt"
 	"os"
 	"testing"
     
@@ -66,7 +68,7 @@ func TestExecutorIntegration(t *testing.T) {
     // Note: SeqScanExecutor currently returns string values due to our hack in nodes.go
     // "123"
     t.Logf("Scanned Tuple: %v", scanTuple.Values)
-    val := scanTuple.Values[0].(string)
+    val := fmt.Sprint(scanTuple.Values[0])
     if val != "123" {
         t.Errorf("Expected 123, got %s", val)
     }
@@ -82,7 +84,13 @@ func TestExecutorIntegration(t *testing.T) {
     if err != nil {
         t.Fatalf("Heap GetTuple failed: %v", err)
     }
-    if string(data) != "123" {
-        t.Errorf("Heap data mismatch: %s", string(data))
+    
+    if len(data) < 4 {
+        t.Fatalf("Expected at least 4 bytes of data, got %d", len(data))
+    }
+    
+    idFromHeap := binary.BigEndian.Uint32(data[:4])
+    if idFromHeap != 123 {
+        t.Errorf("Heap ID mismatch: expected 123, got %d", idFromHeap)
     }
 }
