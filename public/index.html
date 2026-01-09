@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go-RDBMS Management Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .log-font {
+            font-family: 'ui-monospace', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+            font-size: 0.75rem;
+        }
+
+        .terminal-bg {
+            background-color: #0a0f1e;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 p-4 md:p-10">
+
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <div class="lg:col-span-2 space-y-8">
+            <header>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-800">RDBMS Control Plane</h1>
+                <p class="text-sm text-slate-500">Connected to Go-Backend via Port 8080</p>
+            </header>
+
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">1. Data Ingestion
+                    (INSERT)</h2>
+                <div class="flex gap-3">
+                    <input type="text" id="nameInput" placeholder="Enter record name"
+                        class="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="handleInsert()"
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                        Execute Insert
+                    </button>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">2. Record Registry
+                        (SELECT)</h2>
+                    <div class="flex gap-2">
+                        <button onclick="fetchData('SELECT * FROM t')"
+                            class="text-xs bg-slate-100 px-3 py-1 rounded hover:bg-slate-200">Show All</button>
+                        <button onclick="fetchData('SELECT * FROM t WHERE id > 500')"
+                            class="text-xs bg-slate-100 px-3 py-1 rounded hover:bg-slate-200 text-blue-600">IDs >
+                            500</button>
+                    </div>
+                </div>
+
+                <div id="dataTable" class="space-y-2">
+                    <div class="text-center py-10 text-slate-400 italic">No records loaded</div>
+                </div>
+            </section>
+
+            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">3. Relational Logic
+                    (JOIN)</h2>
+                <button onclick="runJoinQuery()"
+                    class="w-full border-2 border-dashed border-slate-300 rounded-xl py-4 text-slate-500 font-medium hover:border-blue-400 hover:text-blue-600 transition-all">
+                    Run Nested Loop Join: SELECT * FROM t JOIN t ON t.id = t.id
+                </button>
+                <div id="joinOutput" class="mt-4 text-sm text-center font-mono font-bold text-blue-600"></div>
+            </section>
+        </div>
+
+        <div class="lg:col-span-1">
+            <div class="terminal-bg rounded-xl shadow-2xl p-6 h-[700px] flex flex-col border border-slate-800">
+                <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Engine Telemetry</h3>
+                <div id="telemetryLog" class="flex-1 overflow-y-auto space-y-3 log-font">
+                    <div class="text-slate-600 italic">System initialized...</div>
+                </div>
+                <button onclick="clearLogs()"
+                    class="mt-4 text-[10px] text-slate-600 hover:text-white uppercase tracking-tighter">Clear
+                    Console</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_URL = "/api/query";
+
+        // Central Query Function
+        async function runQuery(sql) {
+            writeLog(`Executing: ${sql}`, 'command');
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: new URLSearchParams({ 'q': sql })
+                });
+
+                const rawText = await response.text();
+                writeLog(`Raw Response: ${rawText}`, 'response');
+
+                // Regex to capture content inside brackets [219 Buhu]
+                const matches = [...rawText.matchAll(/\[(.*?)\]/g)];
+                const rows = matches.map(m => {
+                    const parts = m[1].trim().split(/\s+/);
+                    return {
+                        id: parts[0],
+                        name: parts.slice(1).join(' ') // Handles names with spaces
+                    };
+                });
+
+                return rows;
+            } catch (err) {
+                writeLog(`Error: ${err.message}`, 'error');
+                return null;
+            }
+        }
+
+        // Action Handlers
+        async function handleInsert() {
+            const input = document.getElementById('nameInput');
+            if (!input.value) return;
+
+            const id = Math.floor(Math.random() * 900) + 100;
+            const sql = `INSERT INTO t VALUES (${id}, '${input.value}')`;
+
+            await runQuery(sql);
+            input.value = '';
+            fetchData('SELECT * FROM t');
+        }
+
+        async function fetchData(sql) {
+            const data = await runQuery(sql);
+            const container = document.getElementById('dataTable');
+
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400 italic">Table empty</div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(row => `
+                <div class="flex items-center justify-between bg-slate-50 p-4 rounded-lg border border-slate-100">
+                    <div class="flex items-center gap-4">
+                        <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold font-mono">${row.id}</span>
+                        <span class="font-medium text-slate-700">${row.name || 'n/a'}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-mono italic">Heap Tuple</span>
+                </div>
+            `).join('');
+        }
+
+        async function runJoinQuery() {
+            const sql = "SELECT * FROM t JOIN t ON t.id = t.id";
+            const data = await runQuery(sql);
+            const output = document.getElementById('joinOutput');
+
+            if (data) {
+                output.innerText = `Join Result: ${data.length} records matched`;
+            }
+        }
+
+        // Logging Utility
+        function writeLog(message, type) {
+            const logContainer = document.getElementById('telemetryLog');
+            const entry = document.createElement('div');
+
+            let color = "text-slate-400";
+            if (type === 'command') color = "text-blue-400 font-bold";
+            if (type === 'response') color = "text-emerald-500";
+            if (type === 'error') color = "text-red-500";
+
+            entry.className = `${color} break-all border-b border-slate-800/50 pb-1`;
+            entry.innerHTML = `<span class="text-slate-700 mr-2">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+
+            logContainer.prepend(entry);
+            console.log(`[${type}]`, message);
+        }
+
+        function clearLogs() {
+            document.getElementById('telemetryLog').innerHTML = '';
+        }
+
+        // Initialize Table
+        window.onload = async () => {
+            await runQuery("CREATE TABLE t (id INT, name VARCHAR)");
+            fetchData('SELECT * FROM t');
+        };
+    </script>
+</body>
+
+</html>

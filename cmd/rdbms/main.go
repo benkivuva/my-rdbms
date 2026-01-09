@@ -29,24 +29,18 @@ func main() {
 }
 
 func startServer(engine *Engine) {
-    http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != "POST" {
-            http.Error(w, "Only POST allowed", 405)
-            return
-        }
-        
+    // API Route
+    http.HandleFunc("/api/query", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != "POST" { return }
         query := r.FormValue("q")
-        if query == "" {
-            http.Error(w, "Missing 'q' parameter", 400)
-            return
-        }
-        
-        // Run query and get result
-        fmt.Println("Received Query:", query)
         result := engine.Execute(query)
         fmt.Fprint(w, result)
     })
-    
-    fmt.Println("Server listening on :8080")
+
+    // Frontend Route: Serves everything in the /public folder
+    fs := http.FileServer(http.Dir("./public"))
+    http.Handle("/", fs)
+
+    fmt.Println("Database Engine & Console active at http://localhost:8080")
     log.Fatal(http.ListenAndServe(":8080", nil))
 }
