@@ -41,15 +41,10 @@ func startServer(engine *Engine) {
             return
         }
         
-        // Capture stdout to buffer to return result?
-        // Or refactor Engine.Execute to return string/error.
-        // For now, let's just log to console and return "OK" or basic info.
-        // Refactoring Execute to return result is better.
-        
-        // Quick Hack: Just run it. Content goes to stdout.
+        // Run query and get result
         fmt.Println("Received Query:", query)
-        engine.Execute(query)
-        fmt.Fprintf(w, "Query executed. Check server logs for output.\n")
+        result := engine.Execute(query)
+        fmt.Fprint(w, result)
     })
     
     fmt.Println("Server listening on :8080")

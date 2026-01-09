@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/benkivuva/my-rdbms/internal/index"
@@ -29,7 +30,14 @@ func (e *SeqScanExecutor) Next() (*Tuple, error) {
 	if data == nil {
 		return nil, nil
 	}
-	return &Tuple{Values: []interface{}{string(data)}}, nil
+
+	if len(data) < 4 {
+		return &Tuple{Values: []interface{}{string(data)}}, nil
+	}
+
+	id := binary.BigEndian.Uint32(data[:4])
+	name := string(data[4:])
+	return &Tuple{Values: []interface{}{int(id), name}}, nil
 }
 
 // InsertExecutor inserts a tuple into the heap and index.
@@ -59,11 +67,19 @@ func (e *InsertExecutor) Next() (*Tuple, error) {
 	switch v := val.(type) {
 	case int:
 		keyVal = int64(v)
-		data = []byte(fmt.Sprintf("%d", v))
+		data = make([]byte, 4)
+		binary.BigEndian.PutUint32(data, uint32(keyVal))
 	case string:
 		return nil, fmt.Errorf("primary key must be int")
 	default:
 		return nil, fmt.Errorf("unsupported type for primary key")
+	}
+
+	// Append name if present
+	if len(e.values) > 1 {
+		if name, ok := e.values[1].(string); ok {
+			data = append(data, []byte(name)...)
+		}
 	}
 
 	// Check for unique constraint violation
@@ -178,8 +194,13 @@ func (e *DeleteExecutor) Next() (*Tuple, error) {
 		// Check if tuple matches WHERE clause
 		match := true
 		if e.cond != nil {
-			val := string(data)
-			match = (e.cond.Op == "=" && val == fmt.Sprintf("%v", e.cond.Value))
+			var val interface{}
+			if len(data) >= 4 {
+				val = int(binary.BigEndian.Uint32(data[:4]))
+			} else {
+				val = string(data)
+			}
+			match = (e.cond.Op == "=" && fmt.Sprintf("%v", val) == fmt.Sprintf("%v", e.cond.Value))
 		}
 
 		if match {
@@ -189,7 +210,11 @@ func (e *DeleteExecutor) Next() (*Tuple, error) {
 			}
 			// Delete from index (parse key from data)
 			var keyVal int64
-			fmt.Sscanf(string(data), "%d", &keyVal)
+			if len(data) >= 4 {
+				keyVal = int64(binary.BigEndian.Uint32(data[:4]))
+			} else {
+				fmt.Sscanf(string(data), "%d", &keyVal)
+			}
 			// Note: B-Tree delete not implemented, but tuple is removed from heap
 			e.count++
 		}

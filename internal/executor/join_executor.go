@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"encoding/binary"
 	"strings"
 
 	"github.com/benkivuva/my-rdbms/internal/storage"
@@ -82,7 +83,14 @@ func (e *NestedLoopJoinExecutor) Next() (*Tuple, error) {
 			continue
 		}
 
-		rightTuple := &Tuple{Values: []interface{}{string(data)}}
+		var rightTuple *Tuple
+		if len(data) >= 4 {
+			id := binary.BigEndian.Uint32(data[:4])
+			name := string(data[4:])
+			rightTuple = &Tuple{Values: []interface{}{int(id), name}}
+		} else {
+			rightTuple = &Tuple{Values: []interface{}{string(data)}}
+		}
 
 		// Extract field values for comparison
 		leftVal := extractFieldValue(e.currentLeftTuple, e.leftField)

@@ -41,76 +41,78 @@ func initEngine(dbName string) (*Engine, error) {
 	return &Engine{bp: bp, dm: dm, heap: heap, btree: btree}, nil
 }
 
-// Execute parses and executes a SQL statement.
-func (e *Engine) Execute(input string) {
+// Execute parses and executes a SQL statement, returning the result as a string.
+func (e *Engine) Execute(input string) string {
+	var out strings.Builder
+
 	l := sql.NewLexer(input)
 	p, err := sql.NewParser(l)
 	if err != nil {
-		fmt.Println("Parser Error:", err)
-		return
+		return fmt.Sprintf("Parser Error: %v\n", err)
 	}
 
 	stmt, err := p.Parse()
 	if err != nil {
-		fmt.Println("Parse Error:", err)
-		return
+		return fmt.Sprintf("Parse Error: %v\n", err)
 	}
 
 	switch s := stmt.(type) {
 	case *sql.InsertStatement:
 		exec := executor.NewInsertExecutor(e.btree, e.heap, s.Values)
 		if _, err := exec.Next(); err != nil {
-			fmt.Println("Execution Error:", err)
+			out.WriteString(fmt.Sprintf("Execution Error: %v\n", err))
 		} else {
-			fmt.Println("INSERT OK")
+			out.WriteString("INSERT OK\n")
 		}
 
 	case *sql.SelectStatement:
 		var exec executor.Executor = executor.NewSeqScanExecutor(e.heap)
-		
+
 		// Handle JOIN
 		if s.Join != nil {
 			exec = executor.NewNestedLoopJoinExecutor(exec, e.heap, s.Join.OnLeftField, s.Join.OnRightField)
 		}
-		
+
 		if s.Where != nil {
 			exec = executor.NewFilterExecutor(exec, s.Where)
 		}
 
-		fmt.Println("----------------")
+		out.WriteString("----------------\n")
 		count := 0
 		for {
 			tuple, err := exec.Next()
 			if err != nil {
-				fmt.Println("Error:", err)
+				out.WriteString(fmt.Sprintf("Error: %v\n", err))
 				break
 			}
 			if tuple == nil {
 				break
 			}
-			fmt.Printf("%v\n", tuple.Values)
+			out.WriteString(fmt.Sprintf("%v\n", tuple.Values))
 			count++
 		}
-		fmt.Printf("(%d rows)\n", count)
+		out.WriteString(fmt.Sprintf("(%d rows)\n", count))
 
 	case *sql.DeleteStatement:
 		exec := executor.NewDeleteExecutor(e.heap, e.btree, s.Where)
 		tuple, err := exec.Next()
 		if err != nil {
-			fmt.Println("Execution Error:", err)
+			out.WriteString(fmt.Sprintf("Execution Error: %v\n", err))
 		} else if tuple != nil {
-			fmt.Printf("DELETE %v rows\n", tuple.Values[0])
+			out.WriteString(fmt.Sprintf("DELETE %v rows\n", tuple.Values[0]))
 		}
 
 	case *sql.UpdateStatement:
-		fmt.Println("UPDATE: Not fully implemented yet (use DELETE + INSERT)")
+		out.WriteString("UPDATE: Not fully implemented yet (use DELETE + INSERT)\n")
 
 	case *sql.CreateTableStatement:
-		fmt.Println("CREATE TABLE: Tables are implicit in this simple engine.")
+		out.WriteString("CREATE TABLE: Tables are implicit in this simple engine.\n")
 
 	default:
-		fmt.Println("Statement not fully supported yet")
+		out.WriteString("Statement not fully supported yet\n")
 	}
+
+	return out.String()
 }
 
 // runREPL starts an interactive SQL shell.
@@ -131,6 +133,6 @@ func runREPL(engine *Engine) {
 		if input == "" {
 			continue
 		}
-		engine.Execute(input)
+		fmt.Print(engine.Execute(input))
 	}
 }
