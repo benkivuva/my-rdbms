@@ -1,95 +1,342 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Go-RDBMS Management Console</title>
+    <title>Go-RDBMS | Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        .log-font {
-            font-family: 'ui-monospace', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-            font-size: 0.75rem;
+        .glass {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        .terminal-bg {
-            background-color: #0a0f1e;
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .collapsible-content {
+            max-height: 800px;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0, 1, 0, 1), opacity 0.3s ease-in-out;
+            opacity: 1;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.3s cubic-bezier(1, 0, 1, 0), opacity 0.2s ease-in-out;
+        }
+
+        .tab-active {
+            color: #f8fafc;
+            border-bottom: 2px solid #0284c7;
+            background: rgba(2, 132, 199, 0.1);
         }
     </style>
 </head>
 
-<body class="bg-gray-50 text-gray-900 p-4 md:p-10">
+<body class="bg-[#020617] text-slate-200 font-sans min-h-screen flex overflow-hidden">
 
-    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        <div class="lg:col-span-2 space-y-8">
-            <header>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-800">RDBMS Control Plane</h1>
-                <p class="text-sm text-slate-500">Connected to Go-Backend via Port 8080</p>
-            </header>
-
-            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">1. Data Ingestion
-                    (INSERT)</h2>
-                <div class="flex gap-3">
-                    <input type="text" id="nameInput" placeholder="Enter record name"
-                        class="flex-1 border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button onclick="handleInsert()"
-                        class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                        Execute Insert
-                    </button>
-                </div>
-            </section>
-
-            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">2. Record Registry
-                        (SELECT)</h2>
-                    <div class="flex gap-2">
-                        <button onclick="fetchData('SELECT * FROM t')"
-                            class="text-xs bg-slate-100 px-3 py-1 rounded hover:bg-slate-200">Show All</button>
-                        <button onclick="fetchData('SELECT * FROM t WHERE id > 500')"
-                            class="text-xs bg-slate-100 px-3 py-1 rounded hover:bg-slate-200 text-blue-600">IDs >
-                            500</button>
-                    </div>
-                </div>
-
-                <div id="dataTable" class="space-y-2">
-                    <div class="text-center py-10 text-slate-400 italic">No records loaded</div>
-                </div>
-            </section>
-
-            <section class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">3. Relational Logic
-                    (JOIN)</h2>
-                <button onclick="runJoinQuery()"
-                    class="w-full border-2 border-dashed border-slate-300 rounded-xl py-4 text-slate-500 font-medium hover:border-blue-400 hover:text-blue-600 transition-all">
-                    Run Nested Loop Join: SELECT * FROM t JOIN t ON t.id = t.id
-                </button>
-                <div id="joinOutput" class="mt-4 text-sm text-center font-mono font-bold text-blue-600"></div>
-            </section>
-        </div>
-
-        <div class="lg:col-span-1">
-            <div class="terminal-bg rounded-xl shadow-2xl p-6 h-[700px] flex flex-col border border-slate-800">
-                <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Engine Telemetry</h3>
-                <div id="telemetryLog" class="flex-1 overflow-y-auto space-y-3 log-font">
-                    <div class="text-slate-600 italic">System initialized...</div>
-                </div>
-                <button onclick="clearLogs()"
-                    class="mt-4 text-[10px] text-slate-600 hover:text-white uppercase tracking-tighter">Clear
-                    Console</button>
+    <!-- Sidebar -->
+    <aside class="w-64 border-r border-slate-800 flex flex-col glass z-20 shrink-0 sticky top-0 h-screen">
+        <div class="p-8 text-white text-center">
+            <div class="flex items-center justify-center gap-3">
+                <div
+                    class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center font-bold text-white shadow-xl shadow-brand-600/20">
+                    G</div>
+                <h1 class="font-bold text-xl tracking-tighter">Go-RDBMS</h1>
             </div>
         </div>
 
-    </div>
+        <nav class="flex-1 mt-4 px-4 space-y-1">
+            <button onclick="switchTab('explorer')" id="sidebar-explorer"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-400 hover:text-slate-100 hover:bg-white/5 tab-active">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4">
+                    </path>
+                </svg>
+                Data Explorer
+            </button>
+            <button onclick="switchTab('joins')" id="sidebar-joins"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-400 hover:text-slate-100 hover:bg-white/5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                    </path>
+                </svg>
+                Joins Simulator
+            </button>
+        </nav>
+
+        <div class="p-4 mt-auto">
+            <div id="record-count-badge" class="bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl text-center">
+                <span class="text-[10px] font-bold text-brand-600 font-mono tracking-widest uppercase">0 TUPLES
+                    LIVE</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 h-screen">
+        <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 glass z-30 shrink-0">
+            <div id="header-tab-name" class="text-slate-100 font-bold text-sm tracking-wide">Data Explorer</div>
+            <div class="flex items-center gap-4">
+                <div id="loading-indicator" class="hidden">
+                    <div class="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <div
+                    class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-white border border-slate-700">
+                    BK</div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Explorer Side -->
+            <div class="flex-1 overflow-y-auto p-8 space-y-8 scroll-smooth" id="main-scroller">
+                <div class="max-w-4xl mx-auto space-y-8">
+
+                    <!-- TAB: EXPLORER -->
+                    <div id="tab-explorer" class="space-y-8">
+                        <!-- 1. Quick Insert -->
+                        <div class="glass p-6 rounded-2xl border border-slate-800/50 shadow-xl">
+                            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Quick Insert
+                            </h3>
+                            <div class="flex gap-3">
+                                <input type="text" id="nameInput" placeholder="Name..."
+                                    class="flex-1 bg-black/40 text-white border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:ring-1 focus:ring-brand-600 transition-all">
+                                <button onclick="handleInsert()"
+                                    class="bg-brand-600 text-white px-8 rounded-xl text-xs font-bold hover:bg-brand-700 shadow-lg shadow-brand-600/20 active:scale-95 transition-all">INSERT</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Direct SQL Shell (Collapsible) -->
+                        <div class="glass rounded-2xl border border-slate-800/80 shadow-2xl overflow-hidden">
+                            <div class="px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all select-none bg-slate-900/40"
+                                onclick="toggleTerminalCollapse()">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-brand-600 font-mono text-sm font-bold tracking-tighter">SQL
+                                        ></span>
+                                    <span class="text-[11px] text-slate-300 font-semibold tracking-wide">Direct SQL
+                                        Shell <span class="text-[9px] text-slate-500 ml-2 font-normal">(Click to
+                                            Expand)</span></span>
+                                </div>
+                                <div id="terminal-chevron" class="transition-transform duration-300 transform">
+                                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <div id="terminal-collapsible" class="collapsible-content collapsed px-6 pb-6 space-y-5">
+                                <div class="h-px bg-slate-800/50 w-full mt-2"></div>
+                                <div class="relative">
+                                    <textarea id="terminal-input" rows="1"
+                                        placeholder="Type query... (Ctrl+Enter to Run)"
+                                        class="w-full bg-black/40 text-slate-100 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:border-brand-600/50 transition-all resize-none shadow-inner"
+                                        onkeydown="if(event.key === 'Enter' && event.ctrlKey) { handleTerminal(this.value); event.preventDefault(); }"></textarea>
+                                    <button onclick="handleTerminal(document.getElementById('terminal-input').value)"
+                                        class="mt-3 w-full bg-slate-100 text-black py-2 rounded-lg text-[10px] font-black uppercase hover:bg-white transition-all shadow-lg active:scale-[0.99]">
+                                        Run Query
+                                    </button>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button onclick="setTerminal('SELECT * FROM t WHERE id > 100')"
+                                        class="px-3 py-1 bg-slate-900 border border-slate-800 rounded-full text-[9px] text-slate-500 hover:text-white font-mono transition-all">Select
+                                        > 100</button>
+                                    <button onclick="setTerminal('DELETE FROM t WHERE id = 123')"
+                                        class="px-3 py-1 bg-slate-900 border border-slate-800 rounded-full text-[9px] text-slate-500 hover:text-white font-mono transition-all">Delete
+                                        ID 123</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Records Table -->
+                        <div class="glass rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
+                            <div
+                                class="px-6 py-4 border-b border-slate-800 bg-white/5 flex items-center justify-between">
+                                <h2 class="font-bold text-[11px] uppercase tracking-widest text-slate-400">Database
+                                    Records</h2>
+                                <button onclick="fetchData('SELECT * FROM t')"
+                                    class="p-2 rounded-lg hover:bg-white/5 transition-all"><svg
+                                        class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                        </path>
+                                    </svg></button>
+                            </div>
+                            <div class="overflow-x-auto min-h-[400px]">
+                                <table class="w-full text-left text-xs">
+                                    <thead
+                                        class="bg-black/20 text-slate-600 text-[10px] uppercase tracking-widest font-extrabold border-b border-slate-800">
+                                        <tr>
+                                            <th class="px-8 py-4">ID</th>
+                                            <th class="px-8 py-4">Name</th>
+                                            <th class="px-8 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dataTableBody" class="divide-y divide-slate-800/30"></tbody>
+                                </table>
+                                <div id="table-empty-state"
+                                    class="flex flex-col items-center justify-center py-24 text-slate-800 font-mono text-[10px] uppercase tracking-[0.4em]">
+                                    Heaps Empty</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: JOINS (SIMULATOR) -->
+                    <div id="tab-joins" class="hidden space-y-8">
+                        <div class="glass p-8 rounded-3xl border border-indigo-500/20 shadow-2xl space-y-8">
+                            <div class="text-center space-y-3">
+                                <h2 class="text-2xl font-black text-white tracking-tighter">Joins Simulator</h2>
+                                <p class="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">Cross-reference the
+                                    "table" with itself. This demonstrates the <span
+                                        class="text-indigo-400 font-mono">NestedLoopJoinExecutor</span> processing rows
+                                    in pairs.</p>
+                            </div>
+
+                            <div
+                                class="bg-slate-900/50 rounded-2xl p-6 border border-slate-800 border-dashed text-center">
+                                <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Command:
+                                    SELECT * FROM t JOIN t ON t.id = t.id</h4>
+                                <button onclick="runJoinTab()"
+                                    class="px-8 py-4 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
+                                    Simulate Join Matches
+                                </button>
+                            </div>
+
+                            <div id="join-results-area"
+                                class="hidden space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <h3
+                                    class="text-[10px] font-extrabold text-indigo-400 uppercase tracking-[0.2em] border-l-2 border-indigo-600 pl-3">
+                                    Relational Result Set</h3>
+                                <div class="glass rounded-2xl overflow-hidden border border-slate-800">
+                                    <table class="w-full text-left text-[11px] font-mono bg-black/40">
+                                        <thead
+                                            class="text-slate-600 text-[10px] uppercase font-bold border-b border-slate-800">
+                                            <tr>
+                                                <th class="px-6 py-4">Left Tuple</th>
+                                                <th class="px-6 py-4 text-center text-indigo-500">Matched By ID</th>
+                                                <th class="px-6 py-4 text-right">Right Tuple</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="joinTableBody" class="divide-y divide-slate-800/40"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Telemetry Side -->
+            <div class="w-96 border-l border-slate-800 flex flex-col glass shrink-0 relative bg-black/20">
+                <div class="p-5 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between">
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Telemetry</h3>
+                    <button onclick="clearLogs()"
+                        class="text-[9px] font-bold uppercase tracking-widest text-slate-600 hover:text-white transition-all ring-1 ring-slate-800 px-2 py-0.5 rounded">Clear</button>
+                </div>
+                <div id="telemetryLog"
+                    class="flex-1 overflow-y-auto p-6 space-y-4 font-mono text-[10px] leading-relaxed select-all">
+                    <div class="text-slate-800 italic opacity-50">// Monitoring buffer...</div>
+                </div>
+            </div>
+        </div>
+    </main>
 
     <script>
         const API_URL = "/api/query";
+        let recordCount = 0;
+        let currentTab = 'explorer';
 
-        // Central Query Function
-        async function runQuery(sql) {
-            writeLog(`Executing: ${sql}`, 'command');
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-explorer').classList.add('hidden');
+            document.getElementById('tab-joins').classList.add('hidden');
+            document.getElementById('sidebar-explorer').classList.remove('tab-active');
+            document.getElementById('sidebar-joins').classList.remove('tab-active');
+
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`sidebar-${tab}`).classList.add('tab-active');
+            document.getElementById('header-tab-name').innerText = tab === 'explorer' ? 'Data Explorer' : 'Joins Simulator';
+
+            if (tab === 'explorer') fetchData('SELECT * FROM t', true);
+        }
+
+        function toggleTerminalCollapse() {
+            const content = document.getElementById('terminal-collapsible');
+            const chevron = document.getElementById('terminal-chevron');
+            content.classList.toggle('collapsed');
+            chevron.classList.toggle('rotate-180');
+        }
+
+        function setTerminal(sql) {
+            const el = document.getElementById('terminal-input');
+            const content = document.getElementById('terminal-collapsible');
+            if (content.classList.contains('collapsed')) toggleTerminalCollapse();
+            el.value = sql;
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+            el.focus();
+        }
+
+        // Auto-expand textarea
+        document.getElementById('terminal-input').addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+
+        async function runQuery(sql, silentTelemetry = false) {
+            if (!silentTelemetry) {
+                writeLog(`CMD: ${sql}`, 'command');
+                document.getElementById('loading-indicator').classList.remove('hidden');
+            }
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -97,93 +344,120 @@
                 });
 
                 const rawText = await response.text();
-                writeLog(`Raw Response: ${rawText}`, 'response');
+                if (!silentTelemetry && rawText) {
+                    writeLog(rawText, 'response');
+                }
 
-                // Regex to capture content inside brackets [219 Buhu]
                 const matches = [...rawText.matchAll(/\[(.*?)\]/g)];
                 const rows = matches.map(m => {
                     const parts = m[1].trim().split(/\s+/);
-                    return {
-                        id: parts[0],
-                        name: parts.slice(1).join(' ') // Handles names with spaces
-                    };
+                    return { id: parts[0], name: parts.slice(1).join(' ') };
                 });
 
                 return rows;
             } catch (err) {
-                writeLog(`Error: ${err.message}`, 'error');
+                writeLog(`ERR: ${err.message}`, 'error');
                 return null;
+            } finally {
+                document.getElementById('loading-indicator').classList.add('hidden');
             }
         }
 
-        // Action Handlers
+        async function handleTerminal(cmd) {
+            if (!cmd) return;
+            await runQuery(cmd);
+            if (currentTab === 'explorer') fetchData('SELECT * FROM t', true);
+        }
+
         async function handleInsert() {
             const input = document.getElementById('nameInput');
             if (!input.value) return;
-
             const id = Math.floor(Math.random() * 900) + 100;
-            const sql = `INSERT INTO t VALUES (${id}, '${input.value}')`;
-
-            await runQuery(sql);
+            await runQuery(`INSERT INTO t VALUES (${id}, '${input.value}')`);
             input.value = '';
-            fetchData('SELECT * FROM t');
+            fetchData('SELECT * FROM t', true);
         }
 
-        async function fetchData(sql) {
-            const data = await runQuery(sql);
-            const container = document.getElementById('dataTable');
+        async function handleDelete(id) {
+            await runQuery(`DELETE FROM t WHERE id = ${id}`);
+            fetchData('SELECT * FROM t', true);
+        }
+
+        async function fetchData(sql, silent = false) {
+            const data = await runQuery(sql, silent);
+            const body = document.getElementById('dataTableBody');
+            const emptyState = document.getElementById('table-empty-state');
 
             if (!data || data.length === 0) {
-                container.innerHTML = `<div class="text-center py-10 text-slate-400 italic">Table empty</div>`;
+                body.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                recordCount = 0;
+                updateStats();
                 return;
             }
 
-            container.innerHTML = data.map(row => `
-                <div class="flex items-center justify-between bg-slate-50 p-4 rounded-lg border border-slate-100">
-                    <div class="flex items-center gap-4">
-                        <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold font-mono">${row.id}</span>
-                        <span class="font-medium text-slate-700">${row.name || 'n/a'}</span>
-                    </div>
-                    <span class="text-[10px] text-slate-400 font-mono italic">Heap Tuple</span>
-                </div>
+            emptyState.classList.add('hidden');
+            body.innerHTML = data.map(row => `
+                <tr class="hover:bg-slate-800/20 group transition-all">
+                    <td class="px-8 py-5">
+                        <span class="bg-brand-600/10 text-brand-600 border border-brand-600/20 px-3 py-1 rounded-lg text-[10px] font-black font-mono">${row.id}</span>
+                    </td>
+                    <td class="px-8 py-5 text-slate-300 font-mono">${row.name || 'null'}</td>
+                    <td class="px-8 py-5 text-right">
+                        <button onclick="handleDelete(${row.id})" class="text-[9px] font-black text-red-500/30 hover:text-red-500 uppercase tracking-widest transition-colors">Drop</button>
+                    </td>
+                </tr>
             `).join('');
-        }
 
-        async function runJoinQuery() {
-            const sql = "SELECT * FROM t JOIN t ON t.id = t.id";
-            const data = await runQuery(sql);
-            const output = document.getElementById('joinOutput');
-
-            if (data) {
-                output.innerText = `Join Result: ${data.length} records matched`;
+            if (!sql.includes('WHERE')) {
+                recordCount = data.length;
+                updateStats();
             }
         }
 
-        // Logging Utility
+        async function runJoinTab() {
+            const data = await runQuery("SELECT * FROM t JOIN t ON t.id = t.id");
+            const resultsArea = document.getElementById('join-results-area');
+            const list = document.getElementById('joinTableBody');
+
+            if (data && data.length > 0) {
+                resultsArea.classList.remove('hidden');
+                list.innerHTML = data.map(row => `
+                    <tr>
+                        <td class="px-6 py-4 text-slate-400 font-bold">[${row.id}] ${row.name}</td>
+                        <td class="px-6 py-4 text-center text-indigo-500 font-black">↔</td>
+                        <td class="px-6 py-4 text-right text-slate-400 font-bold">[${row.id}] ${row.name}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('record-count-badge').innerHTML = `<span class="text-[10px] font-bold text-brand-600 font-mono tracking-widest uppercase">${recordCount} TUPLES LIVE</span>`;
+        }
+
         function writeLog(message, type) {
             const logContainer = document.getElementById('telemetryLog');
             const entry = document.createElement('div');
+            let color = "text-slate-500";
+            if (type === 'command') color = "text-brand-600 font-bold";
+            if (type === 'response') color = "text-emerald-500/80";
+            if (type === 'error') color = "text-red-500 font-bold";
 
-            let color = "text-slate-400";
-            if (type === 'command') color = "text-blue-400 font-bold";
-            if (type === 'response') color = "text-emerald-500";
-            if (type === 'error') color = "text-red-500";
-
-            entry.className = `${color} break-all border-b border-slate-800/50 pb-1`;
-            entry.innerHTML = `<span class="text-slate-700 mr-2">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            entry.className = `${color} break-words whitespace-pre-wrap leading-relaxed`;
+            entry.innerHTML = `<span class="text-slate-800 mr-2 select-none opacity-30">[${new Date().toLocaleTimeString('en-GB')}]</span>${message}`;
 
             logContainer.prepend(entry);
-            console.log(`[${type}]`, message);
+            if (logContainer.children.length > 50) logContainer.removeChild(logContainer.lastChild);
         }
 
         function clearLogs() {
-            document.getElementById('telemetryLog').innerHTML = '';
+            document.getElementById('telemetryLog').innerHTML = '<div class="text-slate-800 italic opacity-40">// Telemetry cleared</div>';
         }
 
-        // Initialize Table
         window.onload = async () => {
-            await runQuery("CREATE TABLE t (id INT, name VARCHAR)");
-            fetchData('SELECT * FROM t');
+            await runQuery("CREATE TABLE t (id INT, name VARCHAR)", true);
+            switchTab('explorer');
         };
     </script>
 </body>
