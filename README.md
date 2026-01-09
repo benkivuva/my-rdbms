@@ -1,21 +1,22 @@
 # Simple RDBMS in Go
 
+![Go CI](https://github.com/benkivuva/my-rdbms/actions/workflows/go.yml/badge.svg)
+
 A lightweight, educational Relational Database Management System built from scratch in Go. This project demonstrates core database concepts including page-based storage, B-Tree indexing, and a Volcano-style query executor.
 
 ## Features
 
-- **Page-Based Storage**: 4KB fixed-size pages with a buffer pool for caching
-- **Slotted Page Layout**: Variable-length tuple storage with efficient space management
-- **B-Tree Index**: O(log n) primary key lookups with leaf node splitting
-- **SQL Parser**: Recursive descent parser supporting basic SQL statements
-- **Volcano Executor**: Pull-based query execution model
-- **Interactive REPL**: Command-line interface for SQL queries
-- **REST API**: HTTP endpoint for remote query execution
+- **Page-Based Storage**: 4KB fixed-size pages with a buffer pool for caching.
+- **Slotted Page Layout**: Variable-length tuple storage with support for record deletion.
+- **B-Tree Index**: O(log n) primary key lookups with unique constraint enforcement.
+- **SQL Parser**: Recursive descent parser supporting `SELECT`, `INSERT`, `DELETE`, and basic `JOIN` syntax.
+- **Volcano Executor**: Pull-based query execution model supporting Joins and Filters.
+- **Interactive REPL**: Command-line interface for real-time SQL queries.
+- **REST API**: HTTP endpoint for remote query execution.
 
 ## Installation
 
 ### Clone the Repository
-
 ```bash
 git clone https://github.com/benkivuva/my-rdbms.git
 cd my-rdbms
@@ -23,8 +24,8 @@ cd my-rdbms
 
 ### Prerequisites
 
-- Go 1.18 or higher
-- Git
+* Go 1.25 or higher
+* Git
 
 ## Project Structure
 
@@ -35,13 +36,12 @@ my-rdbms/
 │   │   ├── main.go         # Entry point
 │   │   └── repl.go         # Interactive shell logic
 │   └── btree_test/         # B-Tree verification utility
-│       └── main.go
 ├── internal/
 │   ├── storage/            # Disk and memory management
 │   │   ├── page.go         # Page definition (4KB)
 │   │   ├── disk_manager.go # File I/O operations
-│   │   ├── buffer_pool.go  # Page cache
-│   │   ├── slotted_page.go # Tuple layout within pages
+│   │   ├── buffer_pool.go  # LRU Page cache
+│   │   ├── slotted_page.go # Tuple layout with Delete support
 │   │   ├── table_heap.go   # Linked list of pages
 │   │   └── rid.go          # Record identifier
 │   ├── index/              # B-Tree implementation
@@ -49,11 +49,12 @@ my-rdbms/
 │   │   └── btree_node.go   # Node structure
 │   ├── sql/                # SQL parsing
 │   │   ├── lexer.go        # Tokenizer
-│   │   ├── parser.go       # AST builder
+│   │   ├── parser.go       # AST builder with JOIN support
 │   │   └── ast.go          # Statement definitions
 │   └── executor/           # Query execution
 │       ├── executor.go     # Executor interface
-│       └── nodes.go        # SeqScan, Insert, Filter
+│       ├── nodes.go        # SeqScan, Insert, Filter, Delete
+│       └── join_executor.go # Nested Loop Join with iterator reset
 ├── go.mod
 └── README.md
 ```
@@ -63,93 +64,84 @@ my-rdbms/
 ### Run the REPL
 
 ```bash
-go run cmd/rdbms/*.go
+# Clean start (deletes previous DB file)
+rm my_rdbms.db && go run cmd/rdbms/*.go
 ```
 
 Example session:
+
 ```sql
-db> INSERT INTO users VALUES (1)
+db> INSERT INTO users VALUES (1, 'Ben')
 INSERT OK
-db> INSERT INTO users VALUES (42)
+db> INSERT INTO orders VALUES (101, 1, 500)
 INSERT OK
-db> SELECT * FROM users
+db> SELECT * FROM users JOIN orders ON users.id = orders.user_id
 ----------------
-[1]
-[42]
-(2 rows)
+[1 Ben 101 1 500]
+(1 rows)
 db> exit
-```
-
-### Run as HTTP Server
-
-```bash
-go run cmd/rdbms/*.go server
-```
-
-Query via curl:
-```bash
-curl -X POST -d "q=INSERT INTO demo VALUES (123)" http://localhost:8080/query
-curl -X POST -d "q=SELECT * FROM demo" http://localhost:8080/query
 ```
 
 ## Supported SQL
 
 | Statement | Syntax |
-|-----------|--------|
-| INSERT | `INSERT INTO table VALUES (value1, value2, ...)` |
-| SELECT | `SELECT * FROM table [WHERE column = value]` |
-| CREATE TABLE | `CREATE TABLE name (col1 INT, col2 VARCHAR)` |
-
-## Running Tests
-
-```bash
-go test -v ./...
-```
+| --- | --- |
+| **INSERT** | `INSERT INTO table VALUES (value1, value2, ...)` |
+| **SELECT** | `SELECT * FROM table [JOIN table2 ON ...] [WHERE ...]` |
+| **DELETE** | `DELETE FROM table [WHERE ...]` |
+| **CREATE TABLE** | `CREATE TABLE name (col1 INT, col2 VARCHAR)` |
 
 ## Architecture Overview
 
 ### Storage Layer
+
 The storage layer manages persistence through a hierarchy of abstractions:
-- **DiskManager**: Handles raw file I/O for 4KB pages
-- **BufferPool**: Caches frequently accessed pages in memory
-- **SlottedPage**: Organizes variable-length tuples within a page
-- **TableHeap**: Links multiple pages together for table storage
+
+* **DiskManager**: Handles raw file I/O for 4KB pages.
+* **BufferPool**: Caches frequently accessed pages in memory using LRU.
+* **SlottedPage**: Organizes variable-length tuples; manages record "tombstones" for deletion.
+* **TableHeap**: Links multiple pages together for table storage.
 
 ### Index Layer
+
 B-Tree index provides efficient key lookups:
-- Leaf nodes store (key, RID) pairs
-- Internal nodes store (key, child_page_id) pairs
-- Automatic leaf splitting when full
+
+* Leaf nodes store (key, RID) pairs.
+* Automatic leaf splitting when nodes reach capacity.
+* **Enforcement**: Validates unique constraints during the insertion phase.
 
 ### Execution Layer
+
 Volcano-style pull model:
-- Each operator implements `Init()`, `Next()`, `Close()`
-- Data flows upward through operator tree
-- Supports filtering via WHERE clauses
+
+* Each operator implements `Init()`, `Next()`, and `Close()`.
+* **Join Logic**: Implements a Simple Nested Loop Join (SNJL) that rewinds the inner child iterator for every row of the outer child.
 
 ## Limitations
 
-- No transaction support (no ACID guarantees)
-- No concurrent query execution
-- B-Tree index not persisted across restarts
-- Single table per database file
-- No UPDATE or DELETE operations
+* No transaction support (no ACID guarantees).
+* No concurrent query execution (single-threaded access).
+* B-Tree index structure is not persisted across restarts (re-indexing required).
+* Single table per database file.
 
-##  Roadmap & Future Work
+##  Roadmap
 
 ### Phase 1: Persistence & Reliability
-- [ ] **Catalog Persistence**: Store table schemas and B-Tree root IDs in a dedicated Metadata Page (Page 0).
-- [ ] **B-Tree Serialization**: Implement `Serialize/Deserialize` for B-Tree nodes to ensure indexes survive REPL restarts.
-- [ ] **Write-Ahead Logging (WAL)**: Basic redo-logging to provide atomicity in case of crashes.
+
+* [ ] **Catalog Persistence**: Store table schemas and B-Tree root IDs in a dedicated Metadata Page.
+* [ ] **B-Tree Serialization**: Implement `Serialize/Deserialize` to ensure indexes survive restarts.
+* [ ] **Write-Ahead Logging (WAL)**: Redo-logging for crash recovery.
 
 ### Phase 2: SQL Enhancements
-- [ ] **Type System**: Add validation for `VARCHAR` length and `INT` ranges during insertion.
-- [ ] **Delete & Update**: Implement `DeleteExecutor` and `UpdateExecutor` using the RID-based access pattern.
-- [ ] **Joins**: Implement Nested Loop Join (NLJ) support.
+
+* [x] **Delete & Update**: Basic support implemented via RID identification.
+* [x] **Joins**: Nested Loop Join support completed.
+* [ ] **Advanced Joins**: Hash Join implementation for better performance.
 
 ### Phase 3: Performance
-- [ ] **Index Scan**: Update the planner to use `IndexScanExecutor` instead of `SeqScan` when a filter matches the primary key.
-- [ ] **Query Optimizer**: Rule-based optimization for predicate pushdown.
+
+* [ ] **Index Scan**: Optimization to use `IndexScanExecutor` for primary key filters.
+* [ ] **Query Optimizer**: Rule-based optimization for predicate pushdown.
 
 ## License
 
