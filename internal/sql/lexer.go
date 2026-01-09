@@ -66,7 +66,7 @@ func (l *Lexer) scanIdentifier() (Token, error) {
 	val := l.input[start:l.pos]
 	// Check keywords
 	switch strings.ToUpper(val) {
-	case "CREATE", "TABLE", "INSERT", "INTO", "VALUES", "SELECT", "FROM", "WHERE", "DELETE", "AND", "INT", "VARCHAR":
+	case "CREATE", "TABLE", "INSERT", "INTO", "VALUES", "SELECT", "FROM", "WHERE", "DELETE", "AND", "INT", "VARCHAR", "JOIN", "ON", "UPDATE", "SET":
 		return Token{Type: TokenKeyword, Value: strings.ToUpper(val)}, nil
 	}
 	return Token{Type: TokenIdentifier, Value: val}, nil
