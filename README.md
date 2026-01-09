@@ -25,7 +25,7 @@ cd my-rdbms
 
 ### Prerequisites
 
-* Go 1.25 or higher
+* Go 1.21 or higher
 * Git
 
 ## Project Structure
@@ -116,16 +116,17 @@ graph LR
     E --> F[(Disk: .db file)]
 ```
 
-## Supported SQL
+### Data Layout (Binary)
 
-| Statement | Syntax |
-| --- | --- |
-| **INSERT** | `INSERT INTO table VALUES (value1, value2, ...)` |
-| **SELECT** | `SELECT * FROM table [JOIN table2 ON ...] [WHERE ...]` |
-| **DELETE** | `DELETE FROM table [WHERE ...]` |
-| **CREATE TABLE** | `CREATE TABLE name (col1 INT, col2 VARCHAR)` |
+The engine uses a fixed primary-key schema for performance and indexing efficiency:
 
-## Architecture Overview
+| Offset | Length | Type | Description |
+| --- | --- | --- | --- |
+| 0 | 4 Bytes | `Uint32BE` | **Primary Key**: Unique Record Identified |
+| 4 | Variable | `VARCHAR` | **Payload**: Raw string bytes |
+
+> [!TIP]
+> This binary format allows the `B-Tree` to perform extremely fast comparisons on the first 4 bytes of every heap slot without full string deserialization.
 
 ### Storage Layer
 
@@ -151,6 +152,15 @@ Volcano-style pull model:
 * Each operator implements `Init()`, `Next()`, and `Close()`.
 * **Join Logic**: Implements a Simple Nested Loop Join (SNJL) that rewinds the inner child iterator for every row of the outer child.
 * **Telemetry Integration**: The execution lifecycle is hooked into the telemetry pipeline, allowing the Management Console to trace physical row-pulls and join predicate evaluations in real-time.
+
+## Supported SQL
+
+| Statement | Syntax |
+| --- | --- |
+| **INSERT** | `INSERT INTO table VALUES (value1, value2, ...)` |
+| **SELECT** | `SELECT * FROM table [JOIN table2 ON ...] [WHERE ...]` |
+| **DELETE** | `DELETE FROM table [WHERE ...]` |
+| **CREATE TABLE** | `CREATE TABLE name (col1 INT, col2 VARCHAR)` |
 
 ## Limitations
 
